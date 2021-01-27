@@ -75,9 +75,9 @@ module afu
   logic [63:0] temp;
   fifo fifo(.clk(clk), .rst_n(rst),.en(rx.c0.mmioWrValid), .d(rx.c0.data), .q(temp));
   
- always @( * ) 
-	if (rx.c0.mmioRdValid)
-		tx.c2.data = temp;
+ //always @( * ) 
+//	if (rx.c0.mmioRdValid)
+//		tx.c2.data = temp;
 
   // assign tx.c2.data = rx.c0.mmioRdValid ? temp : tx.c2.data;
 
@@ -99,8 +99,10 @@ module afu
 		  // Check the address of the write request. If it maches the address of the
 		  // memory-mapped register (h0020), then write the received data on channel c0 
 		  // to the register.
+		  // TODO I CHANGED STUFF HERE
                   case (mmio_hdr.address)
-                    16'h0020: user_reg <= rx.c0.data[63:0];
+                    //16'h0020: user_reg <= rx.c0.data[63:0];
+					16'h0020: user_reg <= temp;
                   endcase
                end
           end
