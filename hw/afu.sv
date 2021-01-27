@@ -72,11 +72,6 @@ module afu
    assign mmio_hdr = t_ccip_c0_ReqMmioHdr'(rx.c0.hdr);
 	module fifo
 
-  (
-  input clk,rst_n,en,
-  input [BITS-1:0] d,
-  output [BITS-1:0] q	
-  );
   wire [BITS-1:0] temp;
   fifo fifo(.clk(clk), .rst(rst),.en(rx.c0.mmioWrValid), .d(rx.c0.data), .q(temp));
   assign tx.c2.data = rx.c0.mmioRdValid ? temp : tx.c2.data;
