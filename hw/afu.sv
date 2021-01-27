@@ -70,7 +70,7 @@ module afu
    // for different purposes depending on the response type.
    t_ccip_c0_ReqMmioHdr mmio_hdr;
    assign mmio_hdr = t_ccip_c0_ReqMmioHdr'(rx.c0.hdr);
-	module fifo
+	
 
   logic [63:0] temp;
   fifo fifo(.clk(clk), .rst(rst),.en(rx.c0.mmioWrValid), .d(rx.c0.data), .q(temp));
