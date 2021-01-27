@@ -74,7 +74,12 @@ module afu
 
   logic [63:0] temp;
   fifo fifo(.clk(clk), .rst_n(rst),.en(rx.c0.mmioWrValid), .d(rx.c0.data), .q(temp));
-  assign tx.c2.data = rx.c0.mmioRdValid ? temp : tx.c2.data;
+  
+  always @(temp, rx.c0.mmioRdValid) begin
+	if (rx.c0.mmioRdValid)
+		tx.c2.data <= temp
+	end
+  // assign tx.c2.data = rx.c0.mmioRdValid ? temp : tx.c2.data;
 
    // =============================================================//   
    // MMIO write code
