@@ -70,7 +70,19 @@ module afu
    // for different purposes depending on the response type.
    t_ccip_c0_ReqMmioHdr mmio_hdr;
    assign mmio_hdr = t_ccip_c0_ReqMmioHdr'(rx.c0.hdr);
+	module fifo
 
+  (
+  input clk,rst_n,en,
+  input [BITS-1:0] d,
+  output [BITS-1:0] q	
+  );
+  wire [BITS-1:0] temp;
+  fifo fifo(.clk(clk), .rst(rst),.en(rx.c0.mmioWrValid), .d(rx.c0.data), .q(temp));
+  always @(rx.c0.mmioRdValid, temp) begin
+	if (rx.c0.mmioRdValid)
+		tx.c2.data <= temp
+  end
    // =============================================================//   
    // MMIO write code
    // =============================================================// 		    
