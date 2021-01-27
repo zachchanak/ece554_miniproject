@@ -77,7 +77,7 @@ module afu
   
  always @( * ) 
 	if (rx.c0.mmioRdValid)
-		tx.c2.data = temp
+		tx.c2.data = temp;
 
   // assign tx.c2.data = rx.c0.mmioRdValid ? temp : tx.c2.data;
 
