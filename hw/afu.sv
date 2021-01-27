@@ -79,10 +79,8 @@ module afu
   );
   wire [BITS-1:0] temp;
   fifo fifo(.clk(clk), .rst(rst),.en(rx.c0.mmioWrValid), .d(rx.c0.data), .q(temp));
-  always @(rx.c0.mmioRdValid, temp) begin
-	if (rx.c0.mmioRdValid)
-		tx.c2.data <= temp
-  end
+  assign tx.c2.data = rx.c0.mmioRdValid ? temp : tx.c2.data;
+
    // =============================================================//   
    // MMIO write code
    // =============================================================// 		    
