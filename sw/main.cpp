@@ -28,7 +28,7 @@
 #include <cstdio>
 #include <climits>
 #include <unistd.h>
-
+#include <time.h>
 #include <opae/utils.h>
 
 #include "AFU.h"
@@ -60,7 +60,7 @@ AB_TYPE A_vals[DIM][DIM];
 AB_TYPE B_vals[DIM][DIM];
 C_TYPE output[DIM][DIM];
 C_TYPE output_reference[DIM][DIM];
-
+#define NS_PER_SECOND 1000000000
 // Reflect Endian
 template<int width, class BT> BT ref_end(BT in)
 {
@@ -183,27 +183,44 @@ int main(int argc, char *argv[]) {
 
 	fprintf(stdout, "FULL SYSTEM TEST\n---------------\n");
 	fprintf(stdout, "Populating A and B...\n");
+	
+	if(argc != 2) {
+		fprintf(stdout, "Usage: ./main <dimension>\n");
+		exit(0);
+	}
+	int dim = atoi(argv[1]);
+	if(dim  == 0  || (dim % 8) != 0) {
+		fprintf(stdout, "Please ensure that dimension is a number or a multiple of 8.\n");
+		exit(0);
+	}
+	AB_TYPE A_vals[dim][dim];
+	AB_TYPE B_vals[dim][dim];
+	C_TYPE C_vals[dim][dim];
+	C_TYPE output[dim][dim];
+	C_TYPE output_reference[dim][dim];
+		
 	// Generate A vals, B vals.
-	for(int y_ind = 0; y_ind < DIM; ++y_ind)
+	for(int y_ind = 0; y_ind < dim; ++y_ind)
 	{
-		for(int x_ind = 0; x_ind < DIM; ++x_ind)
+		for(int x_ind = 0; x_ind < dim; ++x_ind)
 		{
 			A_vals[y_ind][x_ind] = static_cast<int8_t>(rand() % 255);
 			B_vals[y_ind][x_ind] = static_cast<int8_t>(rand() % 255);
+			C_vals[y_ind][x_ind] = static_cast<int8_t>(0);
 		}
 	}
 
 
 	fprintf(stdout, "Calculating reference values of C...\n");
 	// Calculate reference C values.
-	for(int y_ind = 0; y_ind < DIM; ++y_ind)
+	for(int y_ind = 0; y_ind < dim; ++y_ind)
 	{
-		for(int x_ind = 0; x_ind < DIM; ++x_ind)
+		for(int x_ind = 0; x_ind < dim; ++x_ind)
 		{
 			// Calculate C
 			output_reference[y_ind][x_ind] = 0;
 
-			for(ptrdiff_t wh = 0; wh < DIM; ++wh)
+			for(ptrdiff_t wh = 0; wh < dim; ++wh)
 			{
 				output_reference[y_ind][x_ind] += A_vals[y_ind][wh] * B_vals[wh][x_ind];
 			}
@@ -213,38 +230,62 @@ int main(int argc, char *argv[]) {
 	// Now try it with the AFU.
 
 	// Write each value of A down.
-	fprintf(stdout, "Loading A into AFU...\n");
-	for(ptrdiff_t a_r = 0; a_r < DIM; ++a_r)
+	struct timespec start, end, start_compute, end_compute;
+	double total_compute;
+	clock_gettime(CLOCK_REALTIME, &start);
+	for (ptrdiff_t sub_mat_row = 0; sub_mat_row < (dim / 8); sub_mat_row++)
 	{
-		send_row_A(a_r, A_vals[a_r], afu);
+		for (ptrdiff_t sub_mat_col = 0; sub_mat_col < (dim / 8); sub_mat_col++)
+		{	
+			for (ptrdiff_t row = 0; row < DIM; row++) 
+			{
+				send_row_C(row, C_vals[row], afu);
+			}
+ 
+			for (ptrdiff_t num_extend = 0; num_extend < dim / 8; num_extend++)
+			{
+
+				fprintf(stdout, "Loading A into AFU...\n");
+				for(ptrdiff_t a_r = 0; a_r < 8; ++a_r)
+				{
+					send_row_A(a_r, &A_vals[a_r + (sub_mat_row * 8)][num_extend * 8], afu);
+				}
+	
+				// Push each value of B.
+				fprintf(stdout, "Loading B into AFU...\n");
+				for(ptrdiff_t b_r = 0; b_r < 8; ++b_r)
+				{
+					send_row_B(b_r, &B_vals[b_r + (num_extend * 8)][sub_mat_col *  8], afu);
+				}
+	
+				// Calculate
+				fprintf(stdout, "Performing Calculation...\n");
+				clock_gettime(CLOCK_REALTIME, &start_compute);	
+				afu.write(0x0400, 100);
+				clock_gettime(CLOCK_REALTIME, &end_compute);
+				total_compute += (end_compute.tv_nsec - start_compute.tv_nsec);
+				// Do we have to sleep?
+	//			usleep(1000*1000);
+	
+	
+					
+				
+			}
+			fprintf(stdout, "Reading Output from C...\n");
+			for(ptrdiff_t c_r = 0; c_r < DIM; ++c_r)
+			{
+				unpack_from_C(c_r, &output[c_r+(sub_mat_row * 8)][sub_mat_col * 8], afu);
+			}
+
+				
+		}
+	
 	}
+	clock_gettime(CLOCK_REALTIME, &end);
 
-	// Push each value of B.
-	fprintf(stdout, "Loading B into AFU...\n");
-	for(ptrdiff_t b_r = 0; b_r < DIM; ++b_r)
+	for(int r = 0; r < dim; ++r)
 	{
-		send_row_B(b_r, B_vals[b_r], afu);
-	}
-
-	// Calculate
-	fprintf(stdout, "Performing Calculation...\n");
-	afu.write(0x0400, 100);
-	// Do we have to sleep?
-//	usleep(1000*1000);
-
-	// Read Values.
-	fprintf(stdout, "Reading Output from C...\n");
-
-	for(ptrdiff_t c_r = 0; c_r < DIM; ++c_r)
-	{
-		unpack_from_C(c_r, output[c_r], afu);
-	}
-
-	// Compare.
-	fprintf(stdout, "Calculation finished. Testing values...\n");
-	for(int r = 0; r < DIM; ++r)
-	{
-		for(int c = 0; c < DIM; ++c)
+		for(int c = 0; c < dim; ++c)
 		{
 			fprintf(stdout, "row: %d, col: %d | got: %hx, expected %hx", r, c, output[r][c], output_reference[r][c]);
 			fflush(stdout);
@@ -252,9 +293,16 @@ int main(int argc, char *argv[]) {
 			fprintf(stdout, " [OK]\n");
 		}
 	}
-
+	
 	fprintf(stdout, "All tests passed. No errors detected.\n");
-
+	long double total_time = (end.tv_nsec - start.tv_nsec);
+	fprintf(stdout, "TOTAL TIME: %Le ns\n", total_time);
+	long double total_ops_rate;
+	total_ops_rate = (2 * ((dim/ 8)^ 3)* NS_PER_SECOND) / total_time;
+	fprintf(stdout, "Total Ops rate: %Le ops/sec\n", total_ops_rate);
+	long double compute_ops_rate;
+	compute_ops_rate = (2 * ((dim / 8) ^ 3) * NS_PER_SECOND) / total_compute;
+	fprintf(stdout, "Compute ops rate %Le ops/sec\n", compute_ops_rate);
 	return 0;    
   }
   // Exception handling for all the runtime errors that can occur within 
