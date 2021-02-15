@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <opae/utils.h>
-
+#include <math.h>
 #include "AFU.h"
 
 using namespace std;
@@ -298,10 +298,10 @@ int main(int argc, char *argv[]) {
 	long double total_time = (end.tv_nsec - start.tv_nsec);
 	fprintf(stdout, "TOTAL TIME: %Le ns\n", total_time);
 	long double total_ops_rate;
-	total_ops_rate = (2 * ((dim/ 8)^ 3)* NS_PER_SECOND) / total_time;
+	total_ops_rate = (2 * (pow(dim, 3))* NS_PER_SECOND) / total_time;
 	fprintf(stdout, "Total Ops rate: %Le ops/sec\n", total_ops_rate);
 	long double compute_ops_rate;
-	compute_ops_rate = (2 * ((dim / 8) ^ 3) * NS_PER_SECOND) / total_compute;
+	compute_ops_rate = (2 * (pow(dim,3)) * NS_PER_SECOND) / total_compute;
 	fprintf(stdout, "Compute ops rate %Le ops/sec\n", compute_ops_rate);
 	return 0;    
   }
